@@ -1,5 +1,5 @@
 -module(server).
--export([main/1, initial_state/1, change_nick/2, connect/2, disconnect/2]).
+-export([main/1, initial_state/1, connect/2, disconnect/2]).
 -include_lib("./defs.hrl").
 
 
@@ -88,9 +88,5 @@ disconnect(ProcessName, Nick) ->
         user_not_connected -> cchat_errors:err_user_not_connected();
         server_not_reached -> cchat_errors:err_server_not_reached()
     end.
-
-
-change_nick(Pid, Nick) ->
-    helper:request(Pid, {change_nick, Nick}).
 
 
