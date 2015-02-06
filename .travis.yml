@@ -1,0 +1,10 @@
+language: erlang
+
+notifications:
+  email: false
+
+otp_release:
+  - 17.1
+  - 17.0
+
+script: make -s run_tests && make -s run_perf_tests
