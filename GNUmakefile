@@ -1,4 +1,4 @@
-all: gui.beam helper.beam lexgrm.beam cchat.beam server.beam client.beam
+all: gui.beam helper.beam lexgrm.beam cchat.beam server.beam client.beam cchat_errors.beam channel.beam
 
 cchat_errors.beam: cchat_errors.erl
 	erl -compile cchat_errors.erl
