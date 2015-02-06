@@ -1,5 +1,11 @@
 all: gui.beam helper.beam lexgrm.beam cchat.beam server.beam client.beam
 
+cchat_errors.beam: cchat_errors.erl
+	erl -compile cchat_errors.erl
+
+channel.beam: channel.erl defs.hrl helper.beam
+	erl -compile
+
 gui.beam: gui.erl helper.beam
 	erl -compile gui.erl
 
@@ -15,10 +21,10 @@ lexgrm.beam: lexgrm.erl lex.erl grm.erl
 cchat.beam: cchat.erl server.beam gui.beam helper.beam
 	erl -compile cchat.erl
 
-server.beam: server.erl defs.hrl helper.beam
+server.beam: server.erl defs.hrl helper.beam channel.beam
 	erl -compile server.erl
 
-client.beam: client.erl defs.hrl lexgrm.beam helper.beam
+client.beam: client.erl defs.hrl lexgrm.beam helper.beam channel.beam
 	erl -compile client.erl
 
 # ----------------------------------------------------------------------------
