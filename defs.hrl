@@ -3,12 +3,12 @@
 %   gui: the name (or Pid) of the GUI process.
 %   server: the name (or Pid) of the server process.
 %   nick: The nick of the client.
-%   joined_count: Counter for number of channels joined. Must be 0 for disconnect to be allowed.
+%   channels: A dict {channelName -> channelPid} that the client has currently joined.
 -record(cl_st, {
   gui,
   server,
   nick,
-  joined_count
+  channels
 }).
 
 % This record defines the structure of the server process.
@@ -25,4 +25,10 @@
 -record(server_client, {
   nick,
   pid
+}).
+
+
+-record(channel_st, {
+  name,
+  clients
 }).
