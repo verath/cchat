@@ -32,12 +32,13 @@ handle_join_channel(S = #server_st{channels = Channels}, From, MsgRef, ChannelNa
                     From ! {result, MsgRef, user_already_joined},
                     S;
                 false ->
+                    channel:add_client(ChannelPid, From),
                     NewChannels = dict:store(ChannelName, {ChannelPid, [From | ClientPids]}, Channels),
                     From ! {result, MsgRef, {ok, ChannelPid}},
                     S#server_st{channels = NewChannels}
             end;
         error ->
-            ChannelPid = channel:start(ChannelName),
+            ChannelPid = channel:start(ChannelName, [From]),
             NewChannels = dict:store(ChannelName, {ChannelPid, [From]}, Channels),
             From ! {result, MsgRef, {ok, ChannelPid}},
             S#server_st{channels = NewChannels}
@@ -52,6 +53,7 @@ handle_leave_channel(S = #server_st{channels = Channels}, From, MsgRef, ChannelN
             From ! {result, MsgRef, user_not_joined},
             S;
         true ->
+            channel:remove_client(ChannelPid, From),
             NewClientPids = lists:delete(From, ClientPids),
             NewChannels = dict:store(ChannelName, {ChannelPid, NewClientPids}, Channels),
             From ! {result, MsgRef, ok},
@@ -78,9 +80,6 @@ main(S = #server_st{}) ->
             % our server; catch all clause.
             io:format("Server got unexpected message: ~p~n", [Msg]),
             main(S)
-    after 60000 ->
-        % Todo: Should probably not timeout, used for testing.
-        io:format("~s ~n", ["Server: Timeout!"])
     end.
 
 initial_state(ServerName) ->
