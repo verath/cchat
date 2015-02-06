@@ -4,7 +4,7 @@ cchat_errors.beam: cchat_errors.erl
 	erl -compile cchat_errors.erl
 
 channel.beam: channel.erl defs.hrl helper.beam
-	erl -compile
+	erl -compile channel.erl
 
 gui.beam: gui.erl helper.beam
 	erl -compile gui.erl
