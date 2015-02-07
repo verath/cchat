@@ -5,6 +5,9 @@
 %% Receive messages from other processes and handle them accordingly
 main(State = #cl_st{}) ->
     receive
+        {async_request, Request} ->
+            {_, NextState} = loop(State, Request),
+            main(NextState);
         {request, From, Ref, Request} ->
             {Response, NextState} = loop(State, Request),
             From ! {result, Ref, Response},
