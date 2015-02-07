@@ -1,5 +1,5 @@
 -module(client).
--export([main/1, initial_state/2]).
+-export([main/1, initial_state/2, send_message/4]).
 -include_lib("./defs.hrl").
 
 %% Receive messages from other processes and handle them accordingly
@@ -22,6 +22,11 @@ initial_state(Nick, GUIName) ->
         server = undefined,
         channels = orddict:new()
     }.
+
+
+% Forwards a message that was sent to a channel to the client.
+send_message(ClientPid, ChannelName, Nick, Message) ->
+    ClientPid ! {async_request, {ChannelName, Nick, Message}}.
 
 %% ---------------------------------------------------------------------------
 

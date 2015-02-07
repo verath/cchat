@@ -18,7 +18,7 @@ handle_message(St = #channel_st{clients = Clients, name = ChannelName}, From, Re
     % TODO: benchmark this further, for perf tests.
     spawn(fun() ->
         lists:foreach(fun(ClientPid) ->
-            ClientPid ! {async_request, {incoming_msg, ChannelName, Nick, Message}}
+            client:send_message(ClientPid, ChannelName, Nick, Message)
         end, lists:delete(From, Clients))
     end),
     % NOTE: this reply only means channel has received the mesage and nothing about
