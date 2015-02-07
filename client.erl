@@ -2,20 +2,9 @@
 -export([main/1, initial_state/2]).
 -include_lib("./defs.hrl").
 
-%% Receive messages from GUI and handle them accordingly
-main(State = #cl_st{gui = GUI, nick = Nick}) ->
+%% Receive messages from other processes and handle them accordingly
+main(State = #cl_st{}) ->
     receive
-        % TODO: not sure if separate for "message" is allowed?
-        {message, ChannelName, FromNick, Message} ->
-            gen_server:call(list_to_atom(GUI), {msg_to_GUI, ChannelName, FromNick++"> "++Message}),
-            main(State);
-        {ping, From, Timestamp} ->
-            From ! {pong, Nick, Timestamp},
-            main(State);
-        {pong, FromNick, Timestamp} ->
-            Diff = helper:timeSince(Timestamp),
-            gen_server:call(list_to_atom(GUI), {msg_to_SYSTEM, io_lib:format("Pong ~s: ~pms", [FromNick,Diff])}),
-            main(State);
         {request, From, Ref, Request} ->
             {Response, NextState} = loop(State, Request),
             From ! {result, Ref, Response},
@@ -33,7 +22,7 @@ initial_state(Nick, GUIName) ->
 
 %% ---------------------------------------------------------------------------
 
-%% loop handles each kind of request from GUI
+%% loop handles each kind of request from other processes.
 
 %% Connect to server
 loop(St = #cl_st{nick = Nick}, {connect, ServerName}) ->
@@ -41,8 +30,8 @@ loop(St = #cl_st{nick = Nick}, {connect, ServerName}) ->
     case server:connect(Server, Nick) of
         ok ->
             {ok, St#cl_st{server = Server}};
-        Response ->
-            {Response, St}
+        Error ->
+            {Error, St}
     end;
 
 %% Disconnect from server
@@ -54,8 +43,10 @@ loop(St = #cl_st{server = Server}, disconnect) ->
     case orddict:is_empty(St#cl_st.channels) of
         true ->
             case server:disconnect(Server) of
-                ok -> {ok, St#cl_st{server = undefined}};
-                Response -> {Response, St}
+                ok ->
+                    {ok, St#cl_st{server = undefined}};
+                Error ->
+                    {Error, St}
             end;
         false ->
             {cchat_errors:err_leave_channels_first(), St}
@@ -67,8 +58,8 @@ loop(St = #cl_st{server = Server, channels = Channels}, {join, ChannelName}) ->
         {ok, ChannelPid} ->
             NewChannels = orddict:store(ChannelName, ChannelPid, Channels),
             {ok, St#cl_st{channels = NewChannels}};
-        Response ->
-            {Response, St}
+        Error ->
+            {Error, St}
     end;
 
 %% Leave channel
@@ -77,16 +68,17 @@ loop(St = #cl_st{server = Server, channels = Channels}, {leave, ChannelName}) ->
         ok ->
             NewChannels = orddict:erase(ChannelName, Channels),
             {ok, St#cl_st{channels = NewChannels}};
-        Response ->
-            {Response, St}
+        Error ->
+            {Error, St}
     end;
 
 % Sending messages
 loop(St = #cl_st{channels = Channels, nick = Nick}, {msg_from_GUI, ChannelName, Msg}) ->
     case orddict:find(ChannelName, Channels) of
         {ok, ChannelPid} ->
-            helper:requestAsync(ChannelPid, {message, Nick, Msg}),
-            {ok, St};
+            case channel:send_message(ChannelPid, Nick, Msg) of
+                ok -> {ok, St}
+            end;
         error ->
             {cchat_errors:err_user_not_joined(), St}
     end;
@@ -112,6 +104,6 @@ loop(St = #cl_st{server = Server}, {ping, OtherNick}) ->
     end;
 
 %% Incoming message
-loop(St = #cl_st{ gui = GUIName }, {incoming_msg, Channel, Name, Msg}) ->
-    gen_server:call(list_to_atom(GUIName), {msg_to_GUI, Channel, Name++"> "++Msg}),
+loop(St = #cl_st{gui = GUIName}, {incoming_msg, Channel, Name, Msg}) ->
+    gen_server:call(list_to_atom(GUIName), {msg_to_GUI, Channel, Name ++ "> " ++ Msg}),
     {ok, St}.
