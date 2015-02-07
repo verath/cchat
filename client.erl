@@ -26,7 +26,7 @@ initial_state(Nick, GUIName) ->
 
 % Forwards a message that was sent to a channel to the client.
 send_message(ClientPid, ChannelName, Nick, Message) ->
-    ClientPid ! {async_request, {ChannelName, Nick, Message}}.
+    ClientPid ! {async_request, {incoming_msg, ChannelName, Nick, Message}}.
 
 %% ---------------------------------------------------------------------------
 
