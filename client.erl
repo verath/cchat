@@ -3,11 +3,18 @@
 -include_lib("./defs.hrl").
 
 %% Receive messages from GUI and handle them accordingly
-main(State = #cl_st{}) ->
+main(State = #cl_st{gui = GUI, nick = Nick}) ->
     receive
         % TODO: not sure if separate for "message" is allowed?
-        {message, ChannelName, Nick, Message} ->
-            gen_server:call(list_to_atom(State#cl_st.gui), {msg_to_GUI, ChannelName, Nick++"> "++Message}),
+        {message, ChannelName, FromNick, Message} ->
+            gen_server:call(list_to_atom(GUI), {msg_to_GUI, ChannelName, FromNick++"> "++Message}),
+            main(State);
+        {ping, From, Timestamp} ->
+            From ! {pong, Nick, Timestamp},
+            main(State);
+        {pong, FromNick, Timestamp} ->
+            Diff = helper:timeSince(Timestamp),
+            gen_server:call(list_to_atom(GUI), {msg_to_SYSTEM, io_lib:format("Pong ~s: ~pms", [FromNick,Diff])}),
             main(State);
         {request, From, Ref, Request} ->
             {Response, NextState} = loop(State, Request),
@@ -95,6 +102,13 @@ loop(St = #cl_st{}, {nick, Nick}) ->
             {ok, St#cl_st{nick = Nick}};
         St#cl_st.server /= undefined ->
             {cchat_errors:err_user_already_connected(), St}
+    end;
+
+%% ping
+loop(St = #cl_st{server = Server}, {ping, OtherNick}) ->
+    case server:ping(Server, OtherNick) of
+        ok -> {ok, St};
+        Response -> {Response, St}
     end;
 
 %% Incoming message

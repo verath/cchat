@@ -1,5 +1,5 @@
 -module(server).
--export([main/1, initial_state/1, connect/2, disconnect/1, join_channel/2, leave_channel/2]).
+-export([main/1, initial_state/1, connect/2, disconnect/1, join_channel/2, leave_channel/2, ping/2]).
 -include_lib("./defs.hrl").
 
 
@@ -60,6 +60,16 @@ handle_leave_channel(S = #server_st{channels = Channels}, From, MsgRef, ChannelN
             S#server_st{channels = NewChannels}
     end.
 
+handle_ping(S = #server_st{clients = Clients}, From, MsgRef, Nick, Timestamp) ->
+    case lists:keyfind(Nick, #server_client.nick, Clients) of
+        false ->
+            From ! {result, MsgRef, user_not_found},
+            S;
+        Client ->
+            From ! {result, MsgRef, ok},
+            Client#server_client.pid ! {ping, From, Timestamp},
+            S
+    end.
 
 main(S = #server_st{}) ->
     receive
@@ -74,6 +84,9 @@ main(S = #server_st{}) ->
             main(NewState);
         {request, From, MsgRef, {leave_channel, Channel}} ->
             NewState = handle_leave_channel(S, From, MsgRef, Channel),
+            main(NewState);
+        {request, From, MsgRef, {ping, Nick, Timestamp}} ->
+            NewState = handle_ping(S, From, MsgRef, Nick, Timestamp),
             main(NewState);
         Msg ->
             % To make sure nothing is sending accidental messages to
@@ -133,4 +146,10 @@ leave_channel(Server, Channel) ->
     case helper:request(Server, {leave_channel, Channel}) of
         ok -> ok;
         user_not_joined -> cchat_errors:err_user_not_joined()
+    end.
+
+ping(Server, OtherNick) ->
+    case helper:request(Server, {ping, OtherNick, now()}) of
+        ok -> ok;
+        user_not_found -> cchat_errors:err_user_not_found()
     end.

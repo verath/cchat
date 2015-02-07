@@ -23,3 +23,6 @@ err_user_not_joined() ->
 
 err_leave_channels_first() ->
   {error, leave_channels_first, "Must leave all channels before disconnecting"}.
+
+err_user_not_found() ->
+  {error, user_not_found, "The user was not found"}.
