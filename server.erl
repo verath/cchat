@@ -67,7 +67,7 @@ handle_ping(S = #server_st{clients = Clients}, From, MsgRef, Nick, Timestamp) ->
             S;
         Client ->
             From ! {result, MsgRef, ok},
-            helper:request(Client#server_client.pid, {incoming_ping, From, Timestamp}),
+            client:ping(Client#server_client.pid, From, Timestamp),
             S
     end.
 

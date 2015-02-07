@@ -1,5 +1,5 @@
 -module(client).
--export([main/1, initial_state/2, send_message/4]).
+-export([main/1, initial_state/2, send_message/4, ping/3]).
 -include_lib("./defs.hrl").
 
 %% Receive messages from other processes and handle them accordingly
@@ -27,6 +27,14 @@ initial_state(Nick, GUIName) ->
 % Forwards a message that was sent to a channel to the client.
 send_message(ClientPid, ChannelName, Nick, Message) ->
     ClientPid ! {async_request, {ChannelName, Nick, Message}}.
+
+% Sends a ping to a client
+ping(ClientPid, FromPid, Timestamp) ->
+    ClientPid ! {async_request, {incoming_ping, FromPid, Timestamp}}.
+
+% Sends a pong to a client
+pong(ClientPid, FromNick, Timestamp) ->
+    ClientPid ! {async_request, {incoming_pong, FromNick, Timestamp}}.
 
 %% ---------------------------------------------------------------------------
 
@@ -113,7 +121,7 @@ loop(St = #cl_st{server = Server}, {ping, OtherNick}) ->
 
 %% Incoming ping
 loop(St = #cl_st{nick = Nick}, {incoming_ping, From, Timestamp}) ->
-    From ! {async_request, {incoming_pong, Nick, Timestamp}},
+    pong(From, Nick, Timestamp),
     {ok, St};
 
 %% Incoming Pong
