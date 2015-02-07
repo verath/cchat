@@ -5,10 +5,6 @@
 %% Receive messages from GUI and handle them accordingly
 main(State = #cl_st{}) ->
     receive
-        % TODO: not sure if separate for "message" is allowed?
-        {message, ChannelName, Nick, Message} ->
-            gen_server:call(list_to_atom(State#cl_st.gui), {msg_to_GUI, ChannelName, Nick++"> "++Message}),
-            main(State);
         {request, From, Ref, Request} ->
             {Response, NextState} = loop(State, Request),
             From ! {result, Ref, Response},
@@ -47,8 +43,10 @@ loop(St = #cl_st{server = Server}, disconnect) ->
     case orddict:is_empty(St#cl_st.channels) of
         true ->
             case server:disconnect(Server) of
-                ok -> {ok, St#cl_st{server = undefined}};
-                Response -> {Response, St}
+                ok ->
+                    {ok, St#cl_st{server = undefined}};
+                Response ->
+                    {Response, St}
             end;
         false ->
             {cchat_errors:err_leave_channels_first(), St}
@@ -78,8 +76,9 @@ loop(St = #cl_st{server = Server, channels = Channels}, {leave, ChannelName}) ->
 loop(St = #cl_st{channels = Channels, nick = Nick}, {msg_from_GUI, ChannelName, Msg}) ->
     case orddict:find(ChannelName, Channels) of
         {ok, ChannelPid} ->
-            helper:requestAsync(ChannelPid, {message, Nick, Msg}),
-            {ok, St};
+            case channel:send_message(ChannelPid, Nick, Msg) of
+                ok -> {ok, St}
+            end;
         error ->
             {cchat_errors:err_user_not_joined(), St}
     end;
