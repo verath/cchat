@@ -99,12 +99,23 @@ loop(St = #cl_st{}, {nick, Nick}) ->
             {cchat_errors:err_user_already_connected(), St}
     end;
 
-%% ping
+%% Send ping
 loop(St = #cl_st{server = Server}, {ping, OtherNick}) ->
     case server:ping(Server, OtherNick) of
         ok -> {ok, St};
-        Response -> {Response, St}
+        Error -> {Error, St}
     end;
+
+%% Incoming ping
+loop(St = #cl_st{nick = Nick}, {incoming_ping, From, Timestamp}) ->
+    From ! {async_request, {incoming_pong, Nick, Timestamp}},
+    {ok, St};
+
+%% Incoming Pong
+loop(St = #cl_st{gui = GUI}, {incoming_pong, OtherNick, Timestamp}) ->
+    Diff = helper:timeSince(Timestamp),
+    gen_server:call(list_to_atom(GUI), {msg_to_SYSTEM, io_lib:format("Pong ~s: ~pms", [OtherNick,Diff])}),
+    {ok, St};
 
 %% Incoming message
 loop(St = #cl_st{gui = GUIName}, {incoming_msg, Channel, Name, Msg}) ->
