@@ -18,14 +18,7 @@ handle_message(St = #channel_st{clients = Clients, name = ChannelName}, From, Re
     % TODO: benchmark this further, for perf tests.
     spawn(fun() ->
         lists:foreach(fun(ClientPid) ->
-            % Not using async since client protocol is to respond to each request,
-            % and if we don't receive the response they might be kept around?
-            SendStatus = helper:request(ClientPid, {incoming_msg, ChannelName, Nick, Message}),
-            case SendStatus of
-                ok -> ok;
-                Error ->
-                    io:format("Failed to send message to client(~p); ~p~n", [ClientPid, Error])
-            end
+            ClientPid ! {async_request, {incoming_msg, ChannelName, Nick, Message}}
         end, lists:delete(From, Clients))
     end),
     % NOTE: this reply only means channel has received the mesage and nothing about
