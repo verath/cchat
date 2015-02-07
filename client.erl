@@ -2,7 +2,7 @@
 -export([main/1, initial_state/2]).
 -include_lib("./defs.hrl").
 
-%% Receive messages from GUI and handle them accordingly
+%% Receive messages from other processes and handle them accordingly
 main(State = #cl_st{}) ->
     receive
         {request, From, Ref, Request} ->
@@ -22,7 +22,7 @@ initial_state(Nick, GUIName) ->
 
 %% ---------------------------------------------------------------------------
 
-%% loop handles each kind of request from GUI
+%% loop handles each kind of request from other processes.
 
 %% Connect to server
 loop(St = #cl_st{nick = Nick}, {connect, ServerName}) ->
@@ -30,8 +30,8 @@ loop(St = #cl_st{nick = Nick}, {connect, ServerName}) ->
     case server:connect(Server, Nick) of
         ok ->
             {ok, St#cl_st{server = Server}};
-        Response ->
-            {Response, St}
+        Error ->
+            {Error, St}
     end;
 
 %% Disconnect from server
@@ -45,8 +45,8 @@ loop(St = #cl_st{server = Server}, disconnect) ->
             case server:disconnect(Server) of
                 ok ->
                     {ok, St#cl_st{server = undefined}};
-                Response ->
-                    {Response, St}
+                Error ->
+                    {Error, St}
             end;
         false ->
             {cchat_errors:err_leave_channels_first(), St}
@@ -58,8 +58,8 @@ loop(St = #cl_st{server = Server, channels = Channels}, {join, ChannelName}) ->
         {ok, ChannelPid} ->
             NewChannels = orddict:store(ChannelName, ChannelPid, Channels),
             {ok, St#cl_st{channels = NewChannels}};
-        Response ->
-            {Response, St}
+        Error ->
+            {Error, St}
     end;
 
 %% Leave channel
@@ -68,8 +68,8 @@ loop(St = #cl_st{server = Server, channels = Channels}, {leave, ChannelName}) ->
         ok ->
             NewChannels = orddict:erase(ChannelName, Channels),
             {ok, St#cl_st{channels = NewChannels}};
-        Response ->
-            {Response, St}
+        Error ->
+            {Error, St}
     end;
 
 % Sending messages
@@ -97,6 +97,6 @@ loop(St = #cl_st{}, {nick, Nick}) ->
     end;
 
 %% Incoming message
-loop(St = #cl_st{ gui = GUIName }, {incoming_msg, Channel, Name, Msg}) ->
-    gen_server:call(list_to_atom(GUIName), {msg_to_GUI, Channel, Name++"> "++Msg}),
+loop(St = #cl_st{gui = GUIName}, {incoming_msg, Channel, Name, Msg}) ->
+    gen_server:call(list_to_atom(GUIName), {msg_to_GUI, Channel, Name ++ "> " ++ Msg}),
     {ok, St}.
