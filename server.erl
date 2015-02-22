@@ -1,5 +1,5 @@
 -module(server).
--export([main/1, initial_state/1, connect/2, disconnect/1, join_channel/2, leave_channel/2]).
+-export([main/1, initial_state/1, connect/2, disconnect/1, change_nick/2, join_channel/2, leave_channel/2]).
 -include_lib("./defs.hrl").
 
 
@@ -22,6 +22,18 @@ handle_disconnect(S = #server_st{clients = Clients}, From, MsgRef) ->
         Client ->
             From ! {result, MsgRef, ok},
             S#server_st{clients = lists:delete(Client, Clients)}
+    end.
+
+handle_change_nick(S = #server_st{clients = Clients}, From, MsgRef, Nick) ->
+    case lists:keyfind(Nick, #server_client.nick, Clients) of
+        false ->
+            NewClient = #server_client{nick = Nick, pid = From},
+            NewClients = lists:keyreplace(From, #server_client.pid, Clients, NewClient),
+            From ! {result, MsgRef, ok},
+            S#server_st{clients = NewClients};
+        _ ->
+            From ! {result, MsgRef, nick_taken},
+            S
     end.
 
 handle_join_channel(S = #server_st{channels = Channels}, From, MsgRef, ChannelName) ->
@@ -68,6 +80,9 @@ main(S = #server_st{}) ->
             main(NewState);
         {request, From, MsgRef, {disconnect}} ->
             NewState = handle_disconnect(S, From, MsgRef),
+            main(NewState);
+        {request, From, MsgRef, {change_nick, Nick}} ->
+            NewState = handle_change_nick(S, From, MsgRef, Nick),
             main(NewState);
         {request, From, MsgRef, {join_channel, Channel}} ->
             NewState = handle_join_channel(S, From, MsgRef, Channel),
@@ -121,6 +136,12 @@ disconnect(ProcessName) ->
         ok -> ok;
         user_not_connected -> cchat_errors:err_user_not_connected();
         server_not_reached -> cchat_errors:err_server_not_reached()
+    end.
+
+change_nick(Server, Nick) ->
+    case helper:request(Server, {change_nick, Nick}) of
+        ok -> ok;
+        nick_taken -> cchat_errors:err_nick_taken()
     end.
 
 join_channel(Server, Channel) ->
