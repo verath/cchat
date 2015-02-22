@@ -8,6 +8,7 @@
     err_user_already_joined/0,
     err_user_not_joined/0,
     err_leave_channels_first/0,
+    err_nick_taken/0,
     err_user_not_found/0
 ]).
 
@@ -29,6 +30,9 @@ err_user_not_joined() ->
 
 err_leave_channels_first() ->
     {error, leave_channels_first, "Must leave all channels before disconnecting"}.
+
+err_nick_taken() ->
+    {error, nick_taken, "That nick is already connected to this server."}.
 
 err_user_not_found() ->
     {error, user_not_found, "The user was not found"}.

@@ -50,11 +50,11 @@ loop(St = #cl_st{nick = Nick}, {connect, ServerName}) ->
             {Error, St}
     end;
 
-%% Disconnect from server
+% Disconnect from server (not connected)
 loop(St, disconnect) when St#cl_st.server == undefined ->
-    % Can not be connected if we dont have a server
     {cchat_errors:err_user_not_connected(), St};
 
+% Disconnect from server (connected)
 loop(St = #cl_st{server = Server}, disconnect) ->
     case orddict:is_empty(St#cl_st.channels) of
         true ->
@@ -103,13 +103,17 @@ loop(St = #cl_st{channels = Channels, nick = Nick}, {msg_from_GUI, ChannelName, 
 loop(St, whoami) ->
     {St#cl_st.nick, St};
 
-%% Change nick
-loop(St = #cl_st{}, {nick, Nick}) ->
-    if
-        St#cl_st.server == undefined ->
+%% Change nick (not connected)
+loop(St = #cl_st{server = Server}, {nick, Nick}) when Server == undefined ->
+    {ok, St#cl_st{nick = Nick}};
+
+% Change nick (connected)
+loop(St = #cl_st{server = Server}, {nick, Nick}) ->
+    case server:change_nick(Server, Nick) of
+        ok ->
             {ok, St#cl_st{nick = Nick}};
-        St#cl_st.server /= undefined ->
-            {cchat_errors:err_user_already_connected(), St}
+        Error ->
+            {Error, St}
     end;
 
 %% Send ping
