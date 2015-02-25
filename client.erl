@@ -20,7 +20,7 @@ initial_state(Nick, GUIName) ->
         nick = Nick,
         gui = GUIName,
         server = undefined,
-        channels = orddict:new()
+        channels = maps:new()
     }.
 
 
@@ -48,15 +48,15 @@ loop(St, disconnect) when St#cl_st.server == undefined ->
 
 % Disconnect from server (connected)
 loop(St = #cl_st{server = Server}, disconnect) ->
-    case orddict:is_empty(St#cl_st.channels) of
-        true ->
+    case maps:size(St#cl_st.channels) of
+        0 ->
             case server:disconnect(Server) of
                 ok ->
                     {ok, St#cl_st{server = undefined}};
                 Error ->
                     {Error, St}
             end;
-        false ->
+        _ ->
             {cchat_errors:err_leave_channels_first(), St}
     end;
 
@@ -64,7 +64,7 @@ loop(St = #cl_st{server = Server}, disconnect) ->
 loop(St = #cl_st{server = Server, channels = Channels}, {join, ChannelName}) ->
     case server:join_channel(Server, ChannelName) of
         {ok, ChannelPid} ->
-            NewChannels = orddict:store(ChannelName, ChannelPid, Channels),
+            NewChannels = maps:put(ChannelName, ChannelPid, Channels),
             {ok, St#cl_st{channels = NewChannels}};
         Error ->
             {Error, St}
@@ -74,7 +74,7 @@ loop(St = #cl_st{server = Server, channels = Channels}, {join, ChannelName}) ->
 loop(St = #cl_st{server = Server, channels = Channels}, {leave, ChannelName}) ->
     case server:leave_channel(Server, ChannelName) of
         ok ->
-            NewChannels = orddict:erase(ChannelName, Channels),
+            NewChannels = maps:remove(ChannelName, Channels),
             {ok, St#cl_st{channels = NewChannels}};
         Error ->
             {Error, St}
@@ -82,7 +82,7 @@ loop(St = #cl_st{server = Server, channels = Channels}, {leave, ChannelName}) ->
 
 % Sending messages
 loop(St = #cl_st{channels = Channels, nick = Nick}, {msg_from_GUI, ChannelName, Msg}) ->
-    case orddict:find(ChannelName, Channels) of
+    case maps:find(ChannelName, Channels) of
         {ok, ChannelPid} ->
             case channel:send_message(ChannelPid, Nick, Msg) of
                 ok -> {ok, St}
