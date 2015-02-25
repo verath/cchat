@@ -46,18 +46,22 @@ handle_join_channel(S = #server_st{channels = Channels}, From, MsgRef, ChannelNa
 
 
 handle_leave_channel(S = #server_st{channels = Channels}, From, MsgRef, ChannelName) ->
-    {ok, {ChannelPid, ClientPids}} = dict:find(ChannelName, Channels),
-
-    case lists:member(From, ClientPids) of
-        false ->
+    case dict:find(ChannelName, Channels) of
+        {ok, {ChannelPid, ClientPids}} ->
+            case lists:member(From, ClientPids) of
+                false ->
+                    From ! {result, MsgRef, user_not_joined},
+                    S;
+                true ->
+                    channel:remove_client(ChannelPid, From),
+                    NewClientPids = lists:delete(From, ClientPids),
+                    NewChannels = dict:store(ChannelName, {ChannelPid, NewClientPids}, Channels),
+                    From ! {result, MsgRef, ok},
+                    S#server_st{channels = NewChannels}
+            end;
+        error ->
             From ! {result, MsgRef, user_not_joined},
-            S;
-        true ->
-            channel:remove_client(ChannelPid, From),
-            NewClientPids = lists:delete(From, ClientPids),
-            NewChannels = dict:store(ChannelName, {ChannelPid, NewClientPids}, Channels),
-            From ! {result, MsgRef, ok},
-            S#server_st{channels = NewChannels}
+            S
     end.
 
 
