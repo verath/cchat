@@ -23,11 +23,6 @@ initial_state(Nick, GUIName) ->
         channels = maps:new()
     }.
 
-
-% Forwards a message that was sent to a channel to the client.
-send_message(ClientPid, ChannelName, Nick, Message) ->
-    ClientPid ! {async_request, {incoming_msg, ChannelName, Nick, Message}}.
-
 %% ---------------------------------------------------------------------------
 
 %% loop handles each kind of request from other processes.
@@ -112,3 +107,12 @@ loop(St = #cl_st{server = Server}, {nick, Nick}) ->
 loop(St = #cl_st{gui = GUIName}, {incoming_msg, Channel, Name, Msg}) ->
     gen_server:call(list_to_atom(GUIName), {msg_to_GUI, Channel, Name ++ "> " ++ Msg}),
     {ok, St}.
+
+
+%%
+%% Public API
+%%
+
+% Forwards a message that was sent to a channel to the client.
+send_message(ClientPid, ChannelName, Nick, Message) ->
+    ClientPid ! {async_request, {incoming_msg, ChannelName, Nick, Message}}.

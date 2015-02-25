@@ -45,12 +45,13 @@ handle_join_channel(S = #server_st{channels = Channels}, From, MsgRef, ChannelNa
                     S;
                 false ->
                     channel:add_client(ChannelPid, From),
-                    NewChannels = maps:put(ChannelName, {ChannelPid, [From | ClientPids]}, Channels),
+                    NewClientPids = {ChannelPid, [From | ClientPids]},
+                    NewChannels = maps:put(ChannelName, NewClientPids, Channels),
                     From ! {result, MsgRef, {ok, ChannelPid}},
                     S#server_st{channels = NewChannels}
             end;
         error ->
-            ChannelPid = channel:start(ChannelName, [From]),
+            ChannelPid = channel:start(ChannelName, From),
             NewChannels = maps:put(ChannelName, {ChannelPid, [From]}, Channels),
             From ! {result, MsgRef, {ok, ChannelPid}},
             S#server_st{channels = NewChannels}
@@ -124,9 +125,9 @@ try_request(ProcessName, Request) ->
     end.
 
 
-%
-% -- API functions for talking to the server --
-%
+%%
+%% Public API
+%%
 
 connect(ProcessName, Nick) ->
     case try_request(ProcessName, {connect, Nick}) of
