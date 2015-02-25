@@ -6,9 +6,10 @@
 -define(SERVERATOM, list_to_atom(?SERVER)).
 -define(MAX, 100000).
 
--define(PERF_1_USERS, 250).
+-define(PERF_1_USERS, 500).
 -define(PERF_2_USERS, 150).
 -define(PERF_2_CHANS, 100).
+-define(PERF_2_MSGS, 5).
 
 % --- Helpers ----------------------------------------------------------------
 
@@ -35,8 +36,9 @@ init(Name) ->
     putStrLn(blue("\n# Test: "++Name)),
     catch(unregister(?SERVERATOM)),
     InitState = server:initial_state(?SERVER),
-    Result = helper:start(?SERVERATOM, InitState, fun server:main/1),
-    assert("server startup", is_pid(Result)).
+    Pid = spawn_link(fun() -> server:main(InitState) end),
+    register(?SERVERATOM, Pid),
+    assert("server startup", is_pid(Pid)).
 
 % Start new GUI and register it as Name
 new_gui(Name) ->
@@ -157,11 +159,12 @@ assert(Message, Condition) ->
 assert(Message, X, Y) ->
     Pfx = Message++": ",
     case (catch(?assert(X =:= Y))) of
-        {'EXIT', Ex} ->
+        {'EXIT', _Ex} ->
             putStrLn(Pfx++red("Fail")),
             putStrLn("Expected: ~p~nGot: ~p", [Y,X]),
-            throw(Ex) ;
-        _            -> putStrLn(Pfx++green("Ok"))
+            % throw(Ex) ;
+            notok ;
+        _ -> putStrLn(Pfx++green("Ok"))
     end.
 assert_ok(Message, X) ->
     assert(Message, X, ok).
@@ -172,34 +175,26 @@ assert_error(Result, Atom) ->
 assert_error(Message, Result, Atom) ->
     Pfx = Message++" fails: ",
     case (catch(assert_error(Result, Atom))) of
-        {'EXIT', Ex} ->
+        {'EXIT', _Ex} ->
             putStrLn(Pfx++red("Passes")),
             putStrLn("Expected error: ~p~nGot: ~p", [Atom,Result]),
-            throw(Ex) ;
-        _            -> putStrLn(Pfx++green("Ok"))
+            % throw(Ex) ;
+            notok ;
+        _ -> putStrLn(Pfx++green("Ok"))
     end.
 
 % --- Output -----------------------------------------------------------------
 
-% dump(S) ->
-%     ?debugFmt("~p",[S]).
-
 % Turn output off/on
 output_off() ->
-    F = fun () -> receive _ -> ok end end,
-    catch(register(output_off, spawn(F))).
+    put(output,off).
 output_on() ->
-    case whereis(output_off) of
-        undefined -> ok ;
-        Pid -> Pid ! die ,
-               catch(unregister(output_off)),
-               ok
-    end.
+    put(output,on).
 
 putStrLn(S) ->
-    case whereis(output_off) of
-        undefined -> io:fwrite(user, <<"~s~n">>, [S]) ;
-        _ -> ok
+    case get(output) of
+        off -> ok ;
+        _   -> io:fwrite(user, <<"~s~n">>, [S])
     end.
 
 putStrLn(S1, S2) ->
@@ -493,12 +488,14 @@ nick_taken_test_DISABLED() ->
 % many_users_one_channel_test_() ->
 %     {timeout, 60, [{test_client,many_users_one_channel}]}.
 
+% Tests that broadcasting is concurrent
 many_users_one_channel() ->
     init("many_users_one_channel"),
     Channel = new_channel(),
     ParentPid = self(),
     F = fun (I) ->
                 fun () ->
+                        output_off(),
                         Is = lists:flatten(io_lib:format("~p", [I])),
                         % {Pid, Nick, ClientAtom} = new_client("user_"++I),
                         Nick = "user_perf1_"++Is,
@@ -521,26 +518,27 @@ many_users_one_channel() ->
     Spawn = fun (I) -> spawn_link(F(I)) end,
     Recv  = fun (_) -> receive ready -> ok end end,
     putStrLn("spawning ~p clients, each connecting to 1 channel...", [?PERF_1_USERS]),
-    output_off(),
     T1 = now(),
     lists:map(Spawn, Seq),
     lists:map(Recv, Seq),
     T2 = now(),
     Time = timer:now_diff(T2, T1),
-    output_on(),
     putStrLn(red("time elapsed: ~p ms"), [Time/1000]),
     ok.
 
 % many_users_many_channels_test_() ->
 %     {timeout, 60, [{test_client,many_users_many_channels}]}.
 
+% Tests that channels are implemented concurrently
 many_users_many_channels() ->
     init("many_users_many_channels"),
     ParentPid = self(),
     ChansSeq = lists:seq(1, ?PERF_2_CHANS),
     UsersSeq = lists:seq(1, ?PERF_2_USERS),
+    MsgsSeq  = lists:seq(1, ?PERF_2_MSGS),
     F = fun (I) ->
                 fun () ->
+                        output_off(),
                         Is = lists:flatten(io_lib:format("~p", [I])),
                         Nick = "user_perf2_"++Is,
                         ClientName = "client_perf2_"++Is,
@@ -553,8 +551,11 @@ many_users_many_channels() ->
                                     Ch_Ixs = lists:flatten(io_lib:format("~p", [Ch_Ix])),
                                     Channel = "#channel_"++Ch_Ixs,
                                     join_channel(ClientAtom, Channel),
-                                    send_message(ClientAtom, Channel, "message_"++Is++"_1"),
-                                    send_message(ClientAtom, Channel, "message_"++Is++"_2"),
+                                    Send = fun (I) ->
+                                                   Is2 = lists:flatten(io_lib:format("~p", [I])),
+                                                   send_message(ClientAtom, Channel, "message_"++Is++"_"++Is2)
+                                           end,
+                                    lists:map(Send, MsgsSeq),
                                     leave_channel(ClientAtom, Channel),
                                     ok
                             end,
@@ -567,12 +568,10 @@ many_users_many_channels() ->
     Spawn = fun (I) -> spawn_link(F(I)) end,
     Recv  = fun (_) -> receive ready -> ok end end,
     putStrLn("spawning ~p clients, each connecting to ~p channels...", [?PERF_2_USERS, ?PERF_2_CHANS]),
-    output_off(),
     T1 = now(),
     lists:map(Spawn, UsersSeq),
     lists:map(Recv, UsersSeq),
     T2 = now(),
     Time = timer:now_diff(T2, T1),
-    output_on(),
     putStrLn(red("time elapsed: ~p ms"), [Time/1000]),
     ok.
