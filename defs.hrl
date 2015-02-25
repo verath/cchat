@@ -3,7 +3,7 @@
 %   gui: the name (or Pid) of the GUI process.
 %   server: the name (or Pid) of the server process.
 %   nick: The nick of the client.
-%   channels: A dict {channelName -> channelPid} that the client has currently joined.
+%   channels: A map {channelName -> channelPid} that the client has currently joined.
 -record(cl_st, {
     gui,
     server,
@@ -15,7 +15,7 @@
 % It contains the following fields:
 %   server: the name of the server process.
 %   clients: A list of server_client records
-%   channels: A dict {channelName -> {channelPid, [clientPid1, clientPid2,...]}}
+%   channels: A map {channelName -> {channelPid, [clientPid1, clientPid2,...]}}
 -record(server_st, {
     server,
     clients,

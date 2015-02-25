@@ -37,7 +37,7 @@ handle_change_nick(S = #server_st{clients = Clients}, From, MsgRef, Nick) ->
     end.
 
 handle_join_channel(S = #server_st{channels = Channels}, From, MsgRef, ChannelName) ->
-    case dict:find(ChannelName, Channels) of
+    case maps:find(ChannelName, Channels) of
         {ok, {ChannelPid, ClientPids}} ->
             case lists:member(From, ClientPids) of
                 true ->
@@ -45,20 +45,21 @@ handle_join_channel(S = #server_st{channels = Channels}, From, MsgRef, ChannelNa
                     S;
                 false ->
                     channel:add_client(ChannelPid, From),
-                    NewChannels = dict:store(ChannelName, {ChannelPid, [From | ClientPids]}, Channels),
+                    NewClientPids = {ChannelPid, [From | ClientPids]},
+                    NewChannels = maps:put(ChannelName, NewClientPids, Channels),
                     From ! {result, MsgRef, {ok, ChannelPid}},
                     S#server_st{channels = NewChannels}
             end;
         error ->
-            ChannelPid = channel:start(ChannelName, [From]),
-            NewChannels = dict:store(ChannelName, {ChannelPid, [From]}, Channels),
+            ChannelPid = channel:start(ChannelName, From),
+            NewChannels = maps:put(ChannelName, {ChannelPid, [From]}, Channels),
             From ! {result, MsgRef, {ok, ChannelPid}},
             S#server_st{channels = NewChannels}
     end.
 
 
 handle_leave_channel(S = #server_st{channels = Channels}, From, MsgRef, ChannelName) ->
-    case dict:find(ChannelName, Channels) of
+    case maps:find(ChannelName, Channels) of
         {ok, {ChannelPid, ClientPids}} ->
             case lists:member(From, ClientPids) of
                 false ->
@@ -67,7 +68,7 @@ handle_leave_channel(S = #server_st{channels = Channels}, From, MsgRef, ChannelN
                 true ->
                     channel:remove_client(ChannelPid, From),
                     NewClientPids = lists:delete(From, ClientPids),
-                    NewChannels = dict:store(ChannelName, {ChannelPid, NewClientPids}, Channels),
+                    NewChannels = maps:put(ChannelName, {ChannelPid, NewClientPids}, Channels),
                     From ! {result, MsgRef, ok},
                     S#server_st{channels = NewChannels}
             end;
@@ -115,7 +116,7 @@ main(S = #server_st{}) ->
     end.
 
 initial_state(ServerName) ->
-    #server_st{server = ServerName, clients = [], channels = dict:new()}.
+    #server_st{server = ServerName, clients = [], channels = maps:new()}.
 
 % Tries to send a message to ProcessName. Does not use
 % helper:request/3 because we need to do some additional
@@ -137,9 +138,9 @@ try_request(ProcessName, Request) ->
     end.
 
 
-%
-% -- API functions for talking to the server --
-%
+%%
+%% Public API
+%%
 
 connect(ProcessName, Nick) ->
     case try_request(ProcessName, {connect, Nick}) of
