@@ -118,7 +118,7 @@ loop(St = #cl_st{server = Server}, {nick, Nick}) ->
 
 %% Send ping
 loop(St = #cl_st{server = Server}, {ping, OtherNick}) ->
-    case server:ping(Server, OtherNick) of
+    case server:ping(Server, OtherNick, now()) of
         ok -> {ok, St};
         Error -> {Error, St}
     end;

@@ -1,5 +1,5 @@
 -module(server).
--export([main/1, initial_state/1, connect/2, disconnect/1, change_nick/2, join_channel/2, leave_channel/2, ping/2]).
+-export([main/1, initial_state/1, connect/2, disconnect/1, change_nick/2, join_channel/2, leave_channel/2, ping/3]).
 -include_lib("./defs.hrl").
 
 
@@ -169,8 +169,8 @@ leave_channel(Server, Channel) ->
         user_not_joined -> cchat_errors:err_user_not_joined()
     end.
 
-ping(Server, OtherNick) ->
-    case helper:request(Server, {ping, OtherNick, now()}) of
+ping(Server, OtherNick, Timestamp) ->
+    case helper:request(Server, {ping, OtherNick, Timestamp}) of
         ok -> ok;
         user_not_found -> cchat_errors:err_user_not_found()
     end.
